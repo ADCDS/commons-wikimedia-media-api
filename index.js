@@ -8,6 +8,8 @@ const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
 // type = AUDIO, VIDEO or BITMAP
 async function fetchSingleMedia(titles, type, timestamp) {
 	try {
+		const splitTitles = titles.split("|");
+
 		const response = await axios.get('https://commons.wikimedia.org/w/api.php', {
 			params: {
 				action: 'query',
@@ -20,11 +22,32 @@ async function fetchSingleMedia(titles, type, timestamp) {
 				iiprop: timestamp ? 'url|mediatype|size|extmetadata' : 'url|size|mediatype'
 			}
 		});
-		const pages = response.data.query?.pages;
+
+		let pages = Object.values(response.data.query?.pages ?? {});
+		for (const title of splitTitles) {
+			const categoryResponse = await axios.get('https://commons.wikimedia.org/w/api.php', {
+				params: {
+					action: 'query',
+					generator: 'images',
+					prop: 'imageinfo',
+					gimlimit: 500,
+					redirects: 1,
+					titles: `Category:${title}`,
+					format: 'json',
+					iiprop: timestamp ? 'url|mediatype|size|extmetadata' : 'url|size|mediatype'
+				}
+			});
+
+			if(categoryResponse.data.query?.pages){
+				const categoryPages = Object.values(categoryResponse.data.query?.pages ?? {});
+				pages = [...pages, ...categoryPages];
+			}
+		}
+
 		if (!pages) return null;
 
 		const medias = []
-		for (const page of Object.values(pages)) {
+		for (const page of pages) {
 			for (const image of page.imageinfo) {
 				if (image.mediatype === type && image.size <= MAX_SIZE_BYTES) {
 					medias.push(image);
