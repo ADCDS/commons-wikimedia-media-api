@@ -2,6 +2,8 @@ const express = require('express');
 const axios = require('axios');
 const app = express();
 const PORT = process.env.PORT || 3000;
+const MAX_SIZE_MB = 5;
+const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
 
 // type = AUDIO, VIDEO or BITMAP
 async function fetchSingleMedia(titles, type, timestamp) {
@@ -14,9 +16,8 @@ async function fetchSingleMedia(titles, type, timestamp) {
 				gimlimit: 500,
 				redirects: 1,
 				titles: titles,
-				// iiprop: 'url',
 				format: 'json',
-				iiprop: timestamp ? 'url|mediatype|extmetadata' : 'url|mediatype'
+				iiprop: timestamp ? 'url|mediatype|size|extmetadata' : 'url|size|mediatype'
 			}
 		});
 		const pages = response.data.query?.pages;
@@ -25,14 +26,14 @@ async function fetchSingleMedia(titles, type, timestamp) {
 		const medias = []
 		for (const page of Object.values(pages)) {
 			for (const image of page.imageinfo) {
-				if (image.mediatype === type) {
+				if (image.mediatype === type && image.size <= MAX_SIZE_BYTES) {
 					medias.push(image);
 				}
 			}
 		}
 
 		if(!timestamp) { // Gets a random image
-			return medias[Math.floor(Math.random() * medias.length)].url;
+			return medias[Math.floor(Math.random() * medias.length)]?.url;
 		} else {
 			let closestImage = null;
 			let minDifference = Infinity;
